@@ -10,6 +10,7 @@ from panda3d.core import DirectionalLight
 from panda3d.core import LPoint3
 from panda3d.core import TransformState
 from panda3d.core import BitMask32
+from panda3d.core import Mat4, Point3, Vec3
 
 from panda3d.bullet import BulletWorld
 from panda3d.bullet import BulletBoxShape
@@ -149,7 +150,16 @@ class Game(ShowBase):
         bodyNP = self.worldNP.attach_new_node(bodyA)
         bodyNP.node().add_shape(shape)
         bodyNP.set_collide_mask(BitMask32.all_on())
-        bodyNP.set_pos(-2, 0, 1)
+        bodyNP.set_pos(-4, 0, 1)
+
+        # x=z로 기울기 설정 (45도 회전) 및 위치 설정
+        rotation = Mat4()
+        rotation.set_rotate_mat(0, Vec3(0, 1, 0))
+        position = Point3(-4, 0, 0)
+        transform = TransformState.make_pos(position).compose(TransformState.make_mat(rotation))
+        # bodyA.set_transform(transform)
+        bodyNP.set_transform(transform)
+        
 
         visNP = loader.load_model('models/box.egg')
         visNP.clear_model_nodes()
@@ -166,7 +176,7 @@ class Game(ShowBase):
         bodyNP.node().set_mass(1.0)
         bodyNP.node().set_deactivation_enabled(False)
         bodyNP.set_collide_mask(BitMask32.all_on())
-        bodyNP.set_pos(2, 0, 1)
+        bodyNP.set_pos(4, 0, 0)
 
         visNP = loader.load_model('models/box.egg')
         visNP.clear_model_nodes()
@@ -174,15 +184,40 @@ class Game(ShowBase):
 
         self.world.attach(bodyB)
 
-        # Hinge
-        pivotA = (2, 0, 0)
-        pivotB = (-2, 0, 0)
-        axisA = (0, 0, 1)
-        axisB = (0, 0, 1)
+        # 위치 및 회전을 설정합니다.
+        position = Point3(0, 0, 0)
+        rotation = Vec3(0, 0, 0)
 
-        hinge = BulletHingeConstraint(bodyA, bodyB, pivotA, pivotB, axisA, axisB, True)
+        # 위치와 회전을 사용하여 TransformState 객체를 생성합니다.
+        transform = TransformState.make_pos(position).compose(TransformState.make_hpr(rotation))
+
+        # Pivot and axis for both bodies
+        pivotA = Point3(4, 0, 0)  # Box B의 위치로 변경
+        pivotB = Point3(0, 0, 0)
+        axisA = Vec3(0, 0, 1)
+        axisB = Vec3(0, 0, 1)
+
+        # Get transformation matrices of Box A and Box B
+        transformA = bodyA.get_transform()
+        transformB = bodyB.get_transform()
+
+        # Calculate relative transform between Box A and Box B
+        relative_transformA = transformA.invert_compose(transform)
+        relative_transformB = transformB.invert_compose(transform)
+
+        # Create TransformState for both bodies
+        frameA = relative_transformA
+        frameB = relative_transformB
+        # frameB = TransformState.make_identity()
+
+        # Create TransformState for both bodies
+        # frameA = TransformState.make_pos(pivotA).compose(TransformState.make_mat(Mat4.rotateMat(0, axisA)))
+        # frameB = TransformState.make_pos(pivotB).compose(TransformState.make_mat(Mat4.rotateMat(0, axisB)))
+
+        # Create HingeConstraint using frames
+        hinge = BulletHingeConstraint(bodyA, bodyB, frameA, frameB, False)
         hinge.set_debug_draw_size(2.0)
-        hinge.set_limit(-90, 180, softness=0.9, bias=0.3, relaxation=1.0)
+        hinge.set_limit(-360, 360, softness=0.9, bias=0.3, relaxation=1.0)
         self.world.attach(hinge)
 
 

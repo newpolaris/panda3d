@@ -9,10 +9,12 @@
 
 
 import sys
+import time
 
 from direct.showbase.ShowBase import ShowBase
 from direct.showbase.InputStateGlobal import inputState
 
+from panda3d.core import Vec3, Point3, GeomNode, GeomVertexFormat, GeomVertexData, GeomTriangles, Geom, GeomVertexWriter
 from panda3d.core import AmbientLight
 from panda3d.core import DirectionalLight
 from panda3d.core import LVector3
@@ -68,6 +70,8 @@ class Game(ShowBase):
         # Task
         taskMgr.add(self.update, 'updateWorld')
 
+        self.start_time = time.time()
+
         # Physics
         self.setup()
 
@@ -109,11 +113,21 @@ class Game(ShowBase):
         self.boxNP.node().apply_central_force(force)
         self.boxNP.node().apply_torque(torque)
 
+
     def update(self, task):
         dt = globalClock.get_dt()
-        self.process_input(dt)
-        #self.world.doPhysics(dt)
-        self.world.do_physics(dt, 5, 1.0/180.0)
+        # self.process_input(dt)
+
+        elapsed_time = time.time() - self.start_time
+        new_size_xz = 1.0 + (4.0 * elapsed_time / 10.0)
+        new_shape = BulletBoxShape(Vec3(new_size_xz, new_size_xz, new_size_xz))
+        self.boxNP.node().removeShape(self.box_shape)
+        self.boxNP.node().addShape(new_shape)
+        self.box_shape = new_shape  # Update the shape reference
+        # self.boxNP.node().set_active(True)
+
+        self.world.do_physics(dt)
+        # self.world.do_physics(dt, 5, 1.0/180.0)
         return task.cont
 
     def cleanup(self):
@@ -154,11 +168,11 @@ class Game(ShowBase):
         self.world.attach(self.groundNP.node())
 
         # Box (dynamic)
-        shape = BulletBoxShape((0.5, 0.5, 0.5))
+        self.box_shape = BulletBoxShape((0.5, 0.5, 0.5))
 
         self.boxNP = self.worldNP.attach_new_node(BulletRigidBodyNode('Box'))
         self.boxNP.node().set_mass(1.0)
-        self.boxNP.node().add_shape(shape)
+        self.boxNP.node().add_shape(self.box_shape)
         self.boxNP.set_pos(0, 0, 2)
         #self.boxNP.set_scale(2, 1, 0.5)
         self.boxNP.set_collide_mask(BitMask32.all_on())
